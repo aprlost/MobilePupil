@@ -1,0 +1,101 @@
+---
+dataloader:
+  train:
+    dataset:
+      type: DavisEyeEllipseDataset
+      root_path: 83dataset
+      split: train
+      caching_events_batch_size: 5000
+      sensor_size: [346, 260, 2]
+      events_interpolation: causal_linear
+      pupil_area: 200
+      num_classes: 1
+      default_resolution: [256, 256]
+    batch_size: 16
+    shuffle: true
+    drop_last: false
+    num_workers: 8
+    persistent_workers: true
+    pin_memory: true
+    prefetch_factor: 2
+
+  val:
+    dataset:
+      type: DavisEyeEllipseDataset
+      root_path: 83dataset
+      split: val
+      caching_events_batch_size: 5000
+      sensor_size: [346, 260, 2]
+      events_interpolation: causal_linear
+      pupil_area: 200
+      num_classes: 1
+      default_resolution: [256, 256]
+    batch_size: 16
+    shuffle: false
+    drop_last: False
+    num_workers: 8
+    persistent_workers: true
+    pin_memory: true
+
+model:
+  type: EPNet
+  input_channels: 4
+
+  fpn_out_channels: 64
+
+  head_dict: {
+    "hm_L": 1, "ab_L": 2, "trig_L": 2, "mask_L": 1,
+    "hm_R": 1, "ab_R": 2, "trig_R": 2, "mask_R": 1,
+  }
+
+
+  temp_start: 1.0
+  temp_end: 0.1
+  temp_epochs: 60
+
+  wing_w: 5.0
+  wing_epsilon: 1.0
+
+
+  loss_weight: {
+    "hm_weight": 1.0,
+    "coord_weight": 2.0,
+    "ab_weight": 1.0,
+    "trig_weight": 1.0,
+    "iou_weight": 15.0,
+  }
+
+train:
+  max_epochs: 120
+  check_val_every_n_epoch: 1
+  ckpt_path: null
+  optimizer:
+    learning_rate: 1.0e-3
+    weight_decay: 1.0e-5
+
+val:
+  ckpt_path: null
+
+logger:
+  type: tensorboard
+  save_dir: /data4/1210_v1
+  name: EPNetv1
+
+callback:
+  - type: ModelCheckpoint
+    monitor: val_dist_L
+    auto_insert_metric_name: true
+    save_top_k: 10
+    mode: min
+    every_n_epochs: 1
+    save_last: true
+    verbose: true
+    filename: "{epoch:02d}-{val_dist_L:.4f}--{val_dist_R:.4f}"
+
+  - type: TQDMProgressBar
+    refresh_rate: 1
+
+  - type: Timer
+
+  - type: LearningRateMonitor
+    logging_interval: epoch
